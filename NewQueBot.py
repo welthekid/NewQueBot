@@ -1,9 +1,11 @@
+import os
+
 import requests
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
-TOKEN = "8203881199:AAELC7oYRfiqm2hKs4dp7TDGtxU1TkPWTG4"
-PEXELS_API_KEY = "sv4ZJjjJuVbE1ypSxFHDw9fqENKAouSyFd98StbuDBm3dYq2iFFlpSEe"
+TOKEN = ("8203881199:AAELC7oYRfiqm2hKs4dp7TDGtxU1TkPWTG4")
+PEXELS_API_KEY = ("sv4ZJjjJuVbE1ypSxFHDw9fqENKAouSyFd98StbuDBm3dYq2iFFlpSEe")
 
 async def image(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
