@@ -1,51 +1,126 @@
 import os
-
 import requests
+from flask import Flask
+from threading import Thread
+
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    ContextTypes
+)
 
-TOKEN = ("8203881199:AAELC7oYRfiqm2hKs4dp7TDGtxU1TkPWTG4")
-PEXELS_API_KEY = ("sv4ZJjjJuVbE1ypSxFHDw9fqENKAouSyFd98StbuDBm3dYq2iFFlpSEe")
+# ===== CONFIG =====
+TOKEN = os.getenv("8203881199:AAH6WWj9vLGAUP0eEla244gQwSSL_mrVjmk")
+SERPER_API_KEY = os.getenv("f087848a0e6e0eeee43b621feda3fb7b2c4a572c")
 
-async def image(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.args:
-        await update.message.reply_text("Use: /image termo_de_busca")
-        return
+if not TOKEN:
+    raise ValueError("TOKEN não encontrado nos Secrets.")
 
-    query = " ".join(context.args)
+if not SERPER_API_KEY:
+    raise ValueError("SERPER_API_KEY não encontrado nos Secrets.")
 
-    headers = {
-        "Authorization": PEXELS_API_KEY
+# ===== KEEP ALIVE =====
+web_app = Flask('')
+
+@web_app.route('/')
+def home():
+    return "Bot rodando!"
+
+def run_web():
+    web_app.run(host='0.0.0.0', port=8080)
+
+def keep_alive():
+    t = Thread(target=run_web)
+    t.start()
+
+# ===== BUSCA DE IMAGEM =====
+def buscar_imagem(query):
+
+    url = "https://google.serper.dev/images"
+
+    payload = {
+        "q": query
     }
 
-    params = {
-        "query": query,
-        "per_page": 1
+    headers = {
+        "X-API-KEY": SERPER_API_KEY,
+        "Content-Type": "application/json"
     }
 
     try:
-        response = requests.get(
-            "https://api.pexels.com/v1/search",
+        response = requests.post(
+            url,
+            json=payload,
             headers=headers,
-            params=params
+            timeout=15
         )
 
         data = response.json()
 
-        if "photos" in data and data["photos"]:
-            image_url = data["photos"][0]["src"]["large"]
-            await update.message.reply_photo(photo=image_url)
-        else:
-            await update.message.reply_text("No image found.")
+        print("RESPOSTA SERPER:", data)
+
+        if "images" in data and len(data["images"]) > 0:
+            return data["images"][0]["imageUrl"]
 
     except Exception as e:
-        print(e)
-        await update.message.reply_text("Error while searching image.")
+        print("ERRO SERPER:", e)
 
+    return None
+
+# ===== /start =====
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    await update.message.reply_text(
+        "Olá!\n\n"
+        "Use:\n"
+        "/image termo\n\n"
+        "Exemplo:\n"
+        "/image carro voador"
+    )
+
+# ===== /image =====
+async def image(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    if not context.args:
+        await update.message.reply_text(
+            "Use: /image termo"
+        )
+        return
+
+    query = " ".join(context.args)
+
+    img = buscar_imagem(query)
+
+    if img:
+        try:
+            await update.message.reply_photo(photo=img)
+
+        except Exception as e:
+            print("ERRO TELEGRAM:", e)
+
+            await update.message.reply_text(
+                f"Não consegui enviar a imagem diretamente.\n\n{img}"
+            )
+    else:
+        await update.message.reply_text(
+            "Nenhuma imagem encontrada."
+        )
+
+# ===== BOT =====
 app = ApplicationBuilder().token(TOKEN).build()
 
-# 🔹 Aqui mudou para "image"
-app.add_handler(CommandHandler("image", image))
+app.add_handler(
+    CommandHandler("start", start)
+)
+
+app.add_handler(
+    CommandHandler("image", image)
+)
+
+# ===== INICIA =====
+keep_alive()
 
 print("Bot iniciado...")
+
 app.run_polling()
